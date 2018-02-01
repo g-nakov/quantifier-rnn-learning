@@ -30,17 +30,19 @@ INPUT_FEATURE = 'x'
 # for variable length sequences,
 # see http://danijar.com/variable-sequence-lengths-in-tensorflow/
 def length(data):
-    """Gets real length of sequences from a padded tensor.
-
-    Args:
-        data: a Tensor, containing sequences
-
-    Returns:
-        a Tensor, of shape [data.shape[0]], containing the length
-        of each sequence
-    """
+    # """Gets real length of sequences from a padded tensor.
+    #
+    # Args:
+    #   data: a Tensor, containing sequences
+    #
+    # Returns:
+    #   a Tensor, of shape [data.shape[0]], containing the length
+    #   of each sequence
+    # """
+    data = tf.slice(data, [0,0,0], [-1,-1, quantifiers.Quantifier.num_chars])
     used = tf.sign(tf.reduce_max(tf.abs(data), reduction_indices=2))
     length = tf.reduce_sum(used, reduction_indices=1)
+    # length = tf.add(1, tf.cast(length, tf.int32))
     length = tf.cast(length, tf.int32)
     return length
 
@@ -59,21 +61,25 @@ def lstm_model_fn(features, labels, mode, params):
     # -- input_labels: [batch_size, num_classes]
     input_labels = labels
     # -- lengths: [batch_size], how long each input really is
+
     lengths = length(input_models)
+    #input_models = tf.Print(input_models, [lengths], "###LEN", summarize=400)
 
     cells = []
     for _ in range(params['num_layers']):
         # TODO: consider other RNN cells?
         cell = tf.nn.rnn_cell.LSTMCell(params['hidden_size'])
-        # dropout
-        cell = tf.nn.rnn_cell.DropoutWrapper(
-            cell, state_keep_prob=params['dropout'])
+
+        # TODO: add dropout, but only during training ???
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            cell = tf.nn.rnn_cell.DropoutWrapper(cell, state_keep_prob=params['dropout'])
+
         cells.append(cell)
     multi_cell = tf.nn.rnn_cell.MultiRNNCell(cells)
 
     # run on input
     # -- output: [batch_size, max_len, out_size]
-    output, _ = tf.nn.dynamic_rnn(
+    output, h_out = tf.nn.dynamic_rnn(
         multi_cell, input_models,
         dtype=tf.float64, sequence_length=lengths)
 
@@ -88,6 +94,10 @@ def lstm_model_fn(features, labels, mode, params):
                + (lengths - 1))
     # -- final_output: [batch_size, out_size]
     final_output = tf.gather(flat_output, indices)
+    # final_output = h_out[params['num_layers']-1].h
+    are_the_same = tf.equal(final_output, h_out[params['num_layers']-1].h)
+    # final_output = tf.Print(final_output, [tf.reduce_min(tf.cast(are_the_same, dtype=tf.float64))],
+    #                         "Test", summarize=400)
     tf.summary.histogram('final_output', final_output)
 
     # make prediction
@@ -171,7 +181,7 @@ class EvalEarlyStopHook(tf.train.SessionRunHook):
     See https://stackoverflow.com/questions/47137061/. """
 
     def __init__(self, estimator, eval_input, filename,
-                 num_steps=50, stop_loss=0.02):
+                 num_steps=50, stop_loss=0.05):
 
         self._estimator = estimator
         self._input_fn = eval_input
@@ -213,7 +223,7 @@ class EvalEarlyStopHook(tf.train.SessionRunHook):
 
 
 def run_trial(eparams, hparams, trial_num,
-              write_path='/tmp/tensorflow/quantexp'):
+              write_path="/tmp/tensorflow/quantexp"):
 
     tf.reset_default_graph()
 
@@ -272,102 +282,72 @@ def run_trial(eparams, hparams, trial_num,
                                          eparams['stop_loss'])])
 
 
-# DEFINE AN EXPERIMENT
-
-def experiment_one_a(write_dir='data/exp1a'):
-
-    eparams = {'num_epochs': 4, 'batch_size': 8,
-               'generator_mode': 'g', 'num_data': 100000,
-               'eval_steps': 50, 'stop_loss': 0.02}
-    hparams = {'hidden_size': 12, 'num_layers': 2, 'max_len': 20,
-               'num_classes': 2, 'dropout': 1.0,
-               'quantifiers': [quantifiers.at_least_n(4),
-                               quantifiers.at_least_n_or_at_most_m(6, 2)]}
-    num_trials = 30
-
-    for idx in range(num_trials):
-        run_trial(eparams, hparams, idx, write_dir)
-
-
-def experiment_one_b(write_dir='data/exp1b'):
-
-    eparams = {'num_epochs': 4, 'batch_size': 8,
-               'generator_mode': 'g', 'num_data': 100000,
-               'eval_steps': 50, 'stop_loss': 0.02}
-    hparams = {'hidden_size': 12, 'num_layers': 2, 'max_len': 20,
-               'num_classes': 2, 'dropout': 1.0,
-               'quantifiers': [quantifiers.at_most_n(3),
-                               quantifiers.at_least_n_or_at_most_m(6, 2)]}
-    num_trials = 30
-
-    for idx in range(num_trials):
-        run_trial(eparams, hparams, idx, write_dir)
-
-
-def experiment_one_c(write_dir='data/exp1c'):
-
-    eparams = {'num_epochs': 4, 'batch_size': 8,
-               'generator_mode': 'g', 'num_data': 100000,
-               'eval_steps': 50, 'stop_loss': 0.02}
-    hparams = {'hidden_size': 12, 'num_layers': 2, 'max_len': 20,
-               'num_classes': 2, 'dropout': 1.0,
-               'quantifiers': [quantifiers.at_least_n(4),
-                               quantifiers.between_m_and_n(6, 10)]}
-    num_trials = 30
-
-    for idx in range(num_trials):
-        run_trial(eparams, hparams, idx, write_dir)
-
-
-def experiment_one_d(write_dir='data/exp1d'):
-
-    eparams = {'num_epochs': 4, 'batch_size': 8,
-               'generator_mode': 'g', 'num_data': 100000,
-               'eval_steps': 50, 'stop_loss': 0.02}
-    hparams = {'hidden_size': 12, 'num_layers': 2, 'max_len': 20,
-               'num_classes': 2, 'dropout': 1.0,
-               'quantifiers': [quantifiers.at_most_n(4),
-                               quantifiers.between_m_and_n(6, 10)]}
-    num_trials = 30
-
-    for idx in range(num_trials):
-        run_trial(eparams, hparams, idx, write_dir)
-
-
 def experiment_two(write_dir='data/exp2'):
 
+    # eval_steps : int(200000/8)
     eparams = {'num_epochs': 4, 'batch_size': 8,
                'generator_mode': 'g', 'num_data': 200000,
-               'eval_steps': 50, 'stop_loss': 0.02}
+               'eval_steps': 50, 'stop_loss': 0.05}
     hparams = {'hidden_size': 12, 'num_layers': 2, 'max_len': 20,
                'num_classes': 2, 'dropout': 1.0,
-               'quantifiers': [quantifiers.first_n(3),
-                               quantifiers.at_least_n(3)]}
+               'quantifiers': [quantifiers.at_least_n(3)]}
     num_trials = 30
 
     for idx in range(num_trials):
         run_trial(eparams, hparams, idx, write_dir)
 
 
-def experiment_three(write_dir='data/exp3'):
-
+def run_eval(saved_dir, max_len=20):
+    max_possible_words = sum(quantifiers.Quantifier.num_chars**k for k in range(max_len+1))
     eparams = {'num_epochs': 4, 'batch_size': 8,
-               'generator_mode': 'g', 'num_data': 300000,
-               'eval_steps': 50, 'stop_loss': 0.02}
-    hparams = {'hidden_size': 12, 'num_layers': 2, 'max_len': 20,
+               'generator_mode': 'g', 'num_data': min(max_possible_words, 200000),
+               'eval_steps': 50, 'stop_loss': 0.05}
+    hparams = {'hidden_size': 12, 'num_layers': 2, 'max_len': max_len,
                'num_classes': 2, 'dropout': 1.0,
-               'quantifiers': [quantifiers.nall, quantifiers.notonly]}
-    num_trials = 30
+               'quantifiers': [quantifiers.at_least_n(3)]}
+    tf.reset_default_graph()
 
-    for idx in range(num_trials):
-        run_trial(eparams, hparams, idx, write_dir)
+    run_config = tf.estimator.RunConfig()
+
+    model = tf.estimator.Estimator(
+        model_fn=lstm_model_fn,
+        params=hparams,
+        model_dir=saved_dir,
+        config=run_config)
+
+    # GENERATE DATA
+    generator = data_gen.DataGenerator(
+        hparams['max_len'], hparams['quantifiers'],
+        mode=eparams['generator_mode'],
+        num_data_points=eparams['num_data'],
+        training_split=1
+    )
+
+    in_data = generator.get_training_data()
+
+    def get_np_data(data):
+        x_data = np.array([datum[0] for datum in data])
+        y_data = np.array([datum[1] for datum in data])
+        return x_data, y_data
 
 
-# TEST
+    # input fn for evaluation
+    test_x, test_y = get_np_data(in_data)
+    eval_input_fn = tf.estimator.inputs.numpy_input_fn(
+        x={INPUT_FEATURE: test_x},
+        y=test_y,
+        batch_size=len(test_x),
+        shuffle=False)
+
+    ev_results = model.evaluate(input_fn=eval_input_fn)
+    results = dict(ev_results.items())
+    return results['loss']
+
+
 def test():
     eparams = {'num_epochs': 4, 'batch_size': 8,
-               'generator_mode': 'g', 'num_data': 10000,
-               'eval_steps': 50, 'stop_loss': 0.02}
+               'generator_mode': 'g', 'num_data': 200000,
+               'eval_steps': 50, 'stop_loss': 0.05}
     hparams = {'hidden_size': 12, 'num_layers': 2, 'max_len': 20,
                'num_classes': 2, 'dropout': 1.0,
                'quantifiers': [quantifiers.at_least_n(4),
@@ -378,23 +358,17 @@ def test():
 
 if __name__ == '__main__':
 
-    # RUN AN EXPERIMENT, with command-line arguments
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp', help='which experiment to run', type=str)
     parser.add_argument('--out_path', help='path to output', type=str)
     args = parser.parse_args()
 
-    func_map = {
-        'one_a': experiment_one_a,
-        'one_b': experiment_one_b,
-        'two': experiment_two,
-        'three': experiment_three,
-        'test': test
-    }
-    func = func_map[args.exp]
+    for i in range(1, 9):
+        print "Loss for words up to {} : {}".format(i, run_eval("data/no_padding/use_me", i))
 
-    if args.out_path:
-        func(args.out_path)
-    else:
-        func()
+    for i in range(1, 9):
+        print "Loss for words up to {} : {}".format(i, run_eval("data/max_padding/use_me", i))
+
+    for i in range(1, 9):
+        print "Loss for words up to {} : {}".format(i, run_eval("data/one_padding/use_me", i))
+
