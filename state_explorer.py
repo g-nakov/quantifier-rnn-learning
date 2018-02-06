@@ -42,14 +42,13 @@ class RNNState(object):
     def __str__(self):
         head = "< {}: {},".format(self.label, self.is_accepted)
         if RNNState.DEBUG:
-            return "{}\n  h:\n{},\n  c:\n{} >".format(head, self.h, self.c)
+            return "{}  h: {}, c: {}>".format(head, self.h, self.c)
         return "{}  h: shape{}, c: shape{} >".format(head, self.h.shape, self.c.shape)
 
     __repr__ = __str__
 
 
 # this is MUTABLE!
-
 class RNNExplorerWithInternalState(object):
 
     def __init__(self, parent, states):
@@ -72,14 +71,17 @@ class RNNExplorerWithInternalState(object):
 
 class RNNStateExplorer(object):
 
-    def __init__(self, saved_dir, num_layers, hidden_size, alphabet=[], ):
+    def __init__(self, saved_dir, num_layers, hidden_size, alphabet=[]):
         self.saved_dir = saved_dir
         self.num_layers = num_layers
         self.hidden_size = hidden_size
         self.alphabet = alphabet
-
         self.char_word = map(lambda x: np.array(x), alphabet)
         self.model = self._build_model()
+
+    # @staticmethod
+    # def fromRnnTrainer(rnnTrainer):
+    #     return RNNStateExplorer(rnnTrainer.)
 
     def _build_model(self):
         tf.reset_default_graph()

@@ -8,6 +8,7 @@ ALPHABET_CP = ALPHABET_C + [P]
 # alphabet as seq of 1-letter words
 ALPHABET_W = [[c] for c in [A, B, C, D]]
 ALPHABET_WP = ALPHABET_W + [[P]]
+PADDING_CHAR = P
 
 TRANS_DICT = {
     A.tobytes(): 'a',
@@ -21,3 +22,10 @@ def to_pretty_str(w):
     return "".join(map(lambda x: TRANS_DICT[x.tobytes()], w))
 
 
+def pad_word(word, up_to=20):
+    padding_len = up_to - len(word)
+    if padding_len <= 0:
+        return word
+    padding = padding_len * [PADDING_CHAR]
+
+    return np.concatenate((word, padding)) if type(word) is np.ndarray else word + padding
