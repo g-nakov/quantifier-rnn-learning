@@ -5,8 +5,6 @@ import data_gen
 import quantifiers
 import util
 from enum import Enum
-from alphabet_utils import PADDING_CHAR
-from alphabet_utils import to_pretty_str
 
 INPUT_FEATURE = 'x'
 
@@ -286,54 +284,3 @@ class QuantifierRnn(object):
         #         suc += 1
         #
         # return (suc*1.)/all
-
-
-if __name__ == '__main__':
-    #
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('--exp', help='which experiment to run', type=str)
-    # parser.add_argument('--out_path', help='path to output', type=str)
-    # args = parser.parse_args()
-    #
-    al3_single = QuantifierRnn("data_al3/one_padding/use_me", quantifiers.at_least_n(3), padding_mode=PaddingMode.SINGLE)
-    al3_none = QuantifierRnn("data/no_padding/use_me", quantifiers.at_least_n(3), padding_mode=PaddingMode.NONE)
-    al3_maxlen = QuantifierRnn("data/max_padding/use_me", quantifiers.at_least_n(3), padding_mode=PaddingMode.MAXLEN)
-    #
-    m_single = QuantifierRnn("data_m/one_padding/use_me", quantifiers.most, padding_mode=PaddingMode.SINGLE)
-    f3_single = QuantifierRnn("data_f3/one_padding/use_me", quantifiers.first_three, padding_mode=PaddingMode.SINGLE)
-
-    # print "Data generation distribution:"
-    # generator = data_gen.DataGenerator(20, [quantifiers.at_least_n(3)], mode='g',
-    #                                    num_data_points=200000, append_padding=False)
-    # training_data = generator.get_training_data()
-    # test_data = generator.get_test_data()
-    # lens_training = dict([(i, 0) for i in range(1, 21)])
-    # for datum in training_data:
-    #     lens_training[int(np.sum(datum[0]) - 20)] += 1
-    # print lens_training
-    # print "Avg length: {}".format(sum([k*i for (k, i) in lens_training.items()])*1./sum(lens_training.values()))
-    #
-    # lens_test = dict([(i, 0) for i in range(1, 21)])
-    # for datum in test_data:
-    #     lens_test[int(np.sum(datum[0]) - 20)] += 1
-    # print lens_test
-    # print "Avg length: {}".format(sum([k*i for (k, i) in lens_test.items()])*1./sum(lens_test.values()))
-
-
-    print "Input format observations with at_least_3:"
-    a = 10*[0]
-    b = 10*[0]
-    c = 10*[0]
-    for i in range(2, 10):
-        a[i] += al3_single.eval(i+1)
-        b[i] += m_single.eval(i+1)
-        c[i] += f3_single.eval(i+1)
-        # print "No padding loss for words up to {} [no, single, max]: {}\t{}\t{}".format(i, m_single.eval(i),
-        #                                                                                 al3_single.eval(i+1), f3_single.eval(i))
-
-    print a
-    print b
-    print c
-    # print "Different quantifiers on short words:"
-    # for i in range(2, 10):
-        # print "Loss for words up to {} : {}\t{}\t{}".format(i, al3_single.eval(i+1), m_single.eval(i+1), f3_single.eval(i+1))

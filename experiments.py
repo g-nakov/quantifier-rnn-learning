@@ -104,6 +104,3 @@ def explore_states():
     if PRINT_TO_STDOUT:
         print states
     return states.get_states()
-
-
-print eval_different_padding()
